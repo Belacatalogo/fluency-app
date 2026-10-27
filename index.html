@@ -1,13 +1,1010 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#12100e" />
-  <title>Fluency</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#060D1F"/>
+
+<!-- iOS PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Fluency"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+
+<!-- Android / general -->
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="application-name" content="Fluency"/>
+
+<!-- SEO / share -->
+<meta name="description" content="Aprenda inglês do A1 ao C2 com IA, flashcards e prática de speaking."/>
+<meta property="og:title" content="Fluency — Aprenda Inglês com IA"/>
+<meta property="og:description" content="Uma aula por dia, de segunda a sexta. Gramática, leitura, escrita, escuta e speaking."/>
+<meta property="og:type" content="website"/>
+
+<title>Fluency</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#060D1F;-webkit-text-size-adjust:100%}
+#root{min-height:100vh}
+
+/* Remove o retângulo azul de foco em todos os elementos clicáveis (iOS Safari, Android, desktop) */
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, [role="button"], input, select, textarea {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+button:focus, a:focus, [role="button"]:focus,
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible,
+button:active, a:active, [role="button"]:active {
+  outline: none !important;
+  -webkit-focus-ring-color: transparent !important;
+}
+/* Remove a borda de seleção que aparece em alguns iOS quando o botão está ativo */
+button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#splash{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;background:linear-gradient(135deg,#060D1F 0%,#0A1428 50%,#0F1E40 100%);font-family:-apple-system,sans-serif}
+#splash-logo{font-size:28px;font-weight:800;color:#E8EFF8;letter-spacing:-0.02em}
+#splash-logo span{background:linear-gradient(135deg,#5B9CF6,#A78BFA);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#bar-wrap{width:180px;height:3px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden}
+#bar{height:3px;background:linear-gradient(90deg,#5B9CF6,#A78BFA);border-radius:4px;width:10%;transition:width 0.5s ease}
+#splash-msg{color:rgba(255,255,255,0.4);font-size:12px}
+#errmsg{color:#F87171;font-size:11px;max-width:280px;text-align:center;display:none;padding:0 20px;line-height:1.6;word-break:break-all}
+
+/* LED azul nos botões de ouvir durante geração de áudio */
+@keyframes __led_pulse__ {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 2px rgba(91,156,246,0.95),
+      0 0 12px rgba(91,156,246,0.6);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px rgba(167,139,250,0.95),
+      0 0 18px rgba(167,139,250,0.6);
+  }
+}
+.__tts_led__ {
+  position: relative;
+  animation: __led_pulse__ 1.0s ease-in-out infinite;
+  transition: transform 0.15s ease;
+}
+.__tts_led__:active {
+  transform: scale(0.97);
+}
+</style>
 </head>
-<body style="margin:0;background:#12100e">
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
+<body>
+<div id="root">
+  <div id="splash">
+    <p id="splash-logo">Fluency<span>.</span></p>
+    <div id="bar-wrap"><div id="bar"></div></div>
+    <p id="splash-msg">Carregando…</p>
+    <p id="errmsg"></p>
+  </div>
+</div>
+<script>
+// Register service worker for PWA / offline
+// Versão atual: APP_VERSION é checada e se mudar, força reload + cache clear
+var APP_VERSION = 'v29';
+var savedVersion = null;
+try { savedVersion = localStorage.getItem('__app_version__'); } catch(e) {}
+
+// Se a versão mudou, limpar todos os caches antes de prosseguir
+if (savedVersion && savedVersion !== APP_VERSION && 'caches' in window) {
+  caches.keys().then(function(names) {
+    return Promise.all(names.map(function(n) { return caches.delete(n); }));
+  });
+}
+// Também limpar blacklist de modelos TTS quando a versão muda
+if (savedVersion && savedVersion !== APP_VERSION) {
+  try {
+    localStorage.removeItem('__tts_dead_models__');
+    localStorage.removeItem('__tts_working_model__');
+  } catch(e) {}
+}
+try { localStorage.setItem('__app_version__', APP_VERSION); } catch(e) {}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').then(function(reg) {
+      // Força verificação de update toda vez que a página abre
+      reg.update();
+      // Se já há um SW ativo aguardando, ativa imediatamente
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      // Detecta novo SW instalando
+      reg.addEventListener('updatefound', function() {
+        var newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', function() {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            // Nova versão instalada - reload depois de skipWaiting
+            newSW.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    }).catch(function(e) { console.warn('SW:', e); });
+
+    // Reload quando SW novo assume controle (1x apenas)
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  });
+}
+
+// iOS unlock: speechSynthesis e AudioContext só funcionam após interação do usuário.
+// Estratégia: a cada toque, garantir que speechSynthesis e AudioContext estão "vivos".
+(function() {
+  var unlocked = false;
+  var sharedAudioCtx = null;
+
+  function getOrCreateAudioCtx() {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      try { sharedAudioCtx = new Ctx(); } catch(e) { return null; }
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      try { sharedAudioCtx.resume(); } catch(e) {}
+    }
+    return sharedAudioCtx;
+  }
+  // Expõe para o bundle reutilizar (Er() no bundle)
+  window.__sharedAudioCtx = getOrCreateAudioCtx;
+
+  function unlockAudio() {
+    try {
+      // Toda vez: garantir AudioContext ativo
+      getOrCreateAudioCtx();
+
+      // Primeira vez: destravar speechSynthesis com utterance silenciosa
+      if (!unlocked && window.speechSynthesis) {
+        unlocked = true;
+        // Alguns iOS precisam de speak inicial vazio para destravar
+        try {
+          var u = new SpeechSynthesisUtterance(' ');
+          u.volume = 0;
+          u.rate = 10;
+          window.speechSynthesis.speak(u);
+        } catch(e) {}
+        // Pré-carrega vozes
+        window.speechSynthesis.getVoices();
+
+        // Destrava também o canal de mídia (<audio>) - importante para
+        // que o áudio TTS use o volume normal do celular, não o do toque/silent.
+        try {
+          if (!window.__sharedHTMLAudio) {
+            var au = document.createElement('audio');
+            au.preload = 'auto';
+            au.setAttribute('playsinline', '');
+            au.setAttribute('webkit-playsinline', '');
+            au.style.display = 'none';
+            document.body.appendChild(au);
+            window.__sharedHTMLAudio = au;
+            // Toca um WAV silencioso de ~1ms para "abrir" o canal de mídia
+            au.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+            au.volume = 0;
+            var p = au.play();
+            if (p && typeof p.catch === 'function') p.catch(function() {});
+          }
+        } catch(e) {}
+      }
+
+      // iOS Safari: se está pausado, retoma
+      if (window.speechSynthesis && window.speechSynthesis.paused) {
+        try { window.speechSynthesis.resume(); } catch(e) {}
+      }
+    } catch(e) { console.warn('[Fluency] unlock audio:', e); }
+  }
+
+  ['touchstart','touchend','mousedown','click','keydown'].forEach(function(ev) {
+    window.addEventListener(ev, unlockAudio, { capture: true });
+  });
+
+  // iOS lazy-carrega vozes
+  if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = function() {
+      window.speechSynthesis.getVoices();
+    };
+    // Chamada inicial para começar a carregar
+    window.speechSynthesis.getVoices();
+  }
+
+  // iOS pausa speechSynthesis após ~15s de inatividade
+  if (window.speechSynthesis) {
+    setInterval(function() {
+      if (!unlocked) return;
+      try {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+      } catch(e) {}
+    }, 8000);
+  }
+
+  // Bug fix: quando o usuário sai do app (PWA iOS), o iOS mantém o último áudio
+  // tocado como "Now Playing" na tela de bloqueio / Central de Controle.
+  // Limpamos o elemento <audio> compartilhado e os metadados de mídia para liberar.
+  function releaseNowPlaying() {
+    try {
+      var au = window.__sharedHTMLAudio;
+      if (au) {
+        try { au.pause(); } catch(e) {}
+        try { au.removeAttribute('src'); } catch(e) {}
+        try { au.src = ''; } catch(e) {}
+        try { au.load(); } catch(e) {}
+      }
+    } catch(e) {}
+    try {
+      if ('mediaSession' in navigator) {
+        try { navigator.mediaSession.metadata = null; } catch(e) {}
+        try { navigator.mediaSession.playbackState = 'none'; } catch(e) {}
+      }
+    } catch(e) {}
+    try {
+      if (window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+        window.speechSynthesis.cancel();
+      }
+    } catch(e) {}
+    try { if (typeof window.__stopHTMLAudio === 'function') window.__stopHTMLAudio(); } catch(e) {}
+    // Parar qualquer stream de microfone aberto (getUserMedia para pronúncia)
+    try {
+      if (window.__pronStream) {
+        window.__pronStream.getTracks().forEach(function(t) { t.stop(); });
+        window.__pronStream = null;
+      }
+    } catch(e) {}
+    // Parar MediaRecorder se ativo
+    try {
+      if (window.__pronMR && window.__pronMR.state !== 'inactive') {
+        window.__pronMR.stop();
+      }
+      window.__pronMR = null;
+    } catch(e) {}
+    // Parar SpeechRecognition se ativo
+    try {
+      if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+        // Não temos referência direta aqui, mas o SR vai parar quando o mic parar
+      }
+    } catch(e) {}
+  }
+  // Quando a aba vira invisível (usuário foi ao home screen, trocou de app etc),
+  // liberar imediatamente o "Now Playing".
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') releaseNowPlaying();
+  });
+  // pagehide é disparado quando a página é descarregada (também em iOS PWA)
+  window.addEventListener('pagehide', releaseNowPlaying);
+  // blur extra (alguns iOS): quando o app perde o foco
+  window.addEventListener('blur', function() {
+    // Pequeno delay: blur dispara em interações internas; só limpa se a aba virou hidden
+    setTimeout(function() {
+      if (document.visibilityState === 'hidden') releaseNowPlaying();
+    }, 50);
+  });
+  // Expor para uso externo (debug/console)
+  window.__releaseNowPlaying = releaseNowPlaying;
+})();
+</script>
+
+<!-- Stub global: garante que window.__ttsState existe ANTES do bundle carregar -->
+<script>
+window.__ttsState = window.__ttsState || {
+  loading: false,
+  error: null,
+  set: function(loading, error) {
+    this.loading = loading;
+    this.error = error;
+    try {
+      window.dispatchEvent(new CustomEvent('ttsstate', {
+        detail: { loading: loading, error: error }
+      }));
+    } catch(e) {}
+  }
+};
+</script>
+
+<!-- Avaliação real de pronúncia via Azure Speech (deve carregar antes do bundle) -->
+<script src="azure-pronunciation.js?v=1"></script>
+
+<!-- bundle.js define window.React, window.ReactDOM e window.__AppComponent -->
+<script src="bundle.js?v=29"></script>
+
+<!-- Renderização em script separado, garantindo execução após bundle.js -->
+<script>
+(function() {
+  function mountApp() {
+    try {
+      document.getElementById('bar').style.width = '90%';
+      document.getElementById('splash-msg').textContent = 'Iniciando…';
+
+      if (!window.ReactDOM || typeof window.ReactDOM.createRoot !== 'function') {
+        throw new Error('ReactDOM.createRoot não está disponível. bundle.js pode não ter carregado.');
+      }
+      if (!window.__AppComponent) {
+        throw new Error('__AppComponent não definido. bundle.js pode não ter carregado corretamente.');
+      }
+
+      window.ReactDOM.createRoot(document.getElementById('root')).render(
+        window.React.createElement(window.__AppComponent)
+      );
+    } catch(e) {
+      document.getElementById('bar').style.width = '100%';
+      document.getElementById('splash-msg').textContent = '';
+      var em = document.getElementById('errmsg');
+      em.style.display = 'block';
+      em.textContent = 'Erro: ' + e.message;
+      console.error('[Fluency] Erro ao montar app:', e);
+    }
+  }
+
+  // bundle.js é síncrono — executa imediatamente após o parse.
+  // Mas em alguns browsers móveis o DOMContentLoaded ainda não disparou.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountApp);
+  } else {
+    mountApp();
+  }
+})();
+</script>
+
+<!-- Efeito LED azul nos botões de ouvir + feedback visual imediato -->
+<script>
+(function() {
+  var _activeBtn = null;
+  var _ledShownAt = 0;
+  var _minLedDuration = 500; // mostrar LED por pelo menos 500ms
+
+  // Heurística: detectar se um botão é de "ouvir áudio".
+  // Procura pelo ícone Volume2/Play/Pause (lucide) ou texto contendo "Ouvir/Parar"
+  function isAudioButton(btn) {
+    if (!btn) return false;
+    var txt = (btn.textContent || '').toLowerCase();
+    if (txt.includes('ouvir') || txt.includes('parar') || txt.includes('gerando')) return true;
+    // Lucide Volume2: <svg class="lucide-volume-2">
+    var svg = btn.querySelector('svg');
+    if (svg) {
+      var cls = (svg.getAttribute('class') || '').toLowerCase();
+      // ícones de áudio: volume, play, pause, square (parar)
+      if (/volume|play|pause|square/.test(cls)) return true;
+      // sem classe lucide explícita mas tem path com d específico do volume
+      var paths = svg.querySelectorAll('path');
+      for (var i = 0; i < paths.length; i++) {
+        var d = paths[i].getAttribute('d') || '';
+        if (d.indexOf('M11 5L6 9') === 0) return true; // volume2 lucide
+      }
+    }
+    return false;
+  }
+
+  function addLed(btn) {
+    if (!btn) return;
+    removeLed();
+    _activeBtn = btn;
+    _ledShownAt = Date.now();
+    btn.classList.add('__tts_led__');
+  }
+
+  function removeLed(force) {
+    if (!_activeBtn) return;
+    var elapsed = Date.now() - _ledShownAt;
+    if (!force && elapsed < _minLedDuration) {
+      // Aguarda atingir duração mínima
+      setTimeout(function() { removeLed(true); }, _minLedDuration - elapsed);
+      return;
+    }
+    _activeBtn.classList.remove('__tts_led__');
+    _activeBtn = null;
+  }
+
+  // Capturamos o clique e, se for botão de áudio, mostramos LED imediatamente
+  document.addEventListener('click', function(e) {
+    var btn = e.target;
+    while (btn && btn !== document.body) {
+      if (btn.tagName === 'BUTTON') break;
+      btn = btn.parentElement;
+    }
+    if (btn && btn.tagName === 'BUTTON') {
+      window.__tts_last_clicked_btn__ = btn;
+      if (isAudioButton(btn)) {
+        addLed(btn);
+
+        // iOS Safari precisa de uma chamada SÍNCRONA a speechSynthesis.speak()
+        // dentro do gesture handler para "destravar" futuras chamadas durante essa
+        // sessão. Disparamos uma utterance silenciosa que termina rápido.
+        try {
+          if (window.speechSynthesis) {
+            // Resume se estiver pausado (iOS pausa após 15s)
+            if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+            var primer = new SpeechSynthesisUtterance('.');
+            primer.volume = 0;
+            primer.rate = 10;
+            window.speechSynthesis.speak(primer);
+          }
+        } catch(e) {}
+
+        // Fail-safe: 5s máximo
+        setTimeout(function() {
+          if (_activeBtn === btn) removeLed(true);
+        }, 5000);
+      }
+    }
+  }, true);
+
+  // Se o speechSynthesis terminar de falar, removemos o LED imediatamente
+  if (window.speechSynthesis) {
+    var checkInterval = setInterval(function() {
+      if (_activeBtn && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+        // Fala terminou
+        var elapsed = Date.now() - _ledShownAt;
+        if (elapsed > 300) { // não remove imediatamente se acabou de iniciar
+          removeLed(true);
+        }
+      }
+    }, 200);
+  }
+
+  // O bundle dispara 'ttsstate' quando começa/termina geração de áudio Gemini.
+  // Mantemos compatibilidade: se loading=true, garante LED no último botão clicado.
+  window.addEventListener('ttsstate', function(ev) {
+    if (ev.detail && ev.detail.loading) {
+      if (!_activeBtn && window.__tts_last_clicked_btn__) {
+        addLed(window.__tts_last_clicked_btn__);
+      }
+    } else {
+      removeLed();
+    }
+  });
+})();
+</script>
+
+<!-- Painel de diagnóstico de áudio (canto superior direito) -->
+<style>
+#__audio_diag__ {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 99999;
+  max-width: 280px;
+  background: rgba(6, 13, 31, 0.95);
+  border: 1px solid rgba(91, 156, 246, 0.4);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: -apple-system, sans-serif;
+  font-size: 11px;
+  color: #E8EFF8;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: opacity 0.3s, transform 0.3s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#__audio_diag__.collapsed {
+  max-width: 44px;
+  padding: 8px;
+  text-align: center;
+  cursor: pointer;
+}
+#__audio_diag__.collapsed .__diag_body__,
+#__audio_diag__.collapsed .__diag_close__ {
+  display: none;
+}
+#__audio_diag__.hidden {
+  display: none;
+}
+#__audio_diag__ .__diag_header__ {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+#__audio_diag__.collapsed .__diag_header__ {
+  margin-bottom: 0;
+  justify-content: center;
+}
+#__audio_diag__ .__diag_dot__ {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34D399;
+  flex-shrink: 0;
+}
+#__audio_diag__ .__diag_dot__.warn { background: #F59E0B; }
+#__audio_diag__ .__diag_dot__.error { background: #F87171; }
+#__audio_diag__ .__diag_dot__.idle { background: #6B7280; }
+#__audio_diag__ .__diag_title__ {
+  flex: 1;
+}
+#__audio_diag__ .__diag_close__ {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #F87171;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+#__audio_diag__ .__diag_close__:active {
+  background: rgba(248, 113, 113, 0.25);
+}
+#__audio_diag__ .__diag_toggle__ {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  font-size: 14px;
+  opacity: 0.6;
+}
+#__audio_diag__ .__diag_row__ {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0;
+  opacity: 0.85;
+  font-size: 10px;
+}
+#__audio_diag__ .__diag_row__ b {
+  color: #5B9CF6;
+  font-weight: 500;
+}
+#__audio_diag__ .__diag_log__ {
+  max-height: 140px;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+  line-height: 1.4;
+}
+#__audio_diag__ .__diag_log__ div {
+  margin: 2px 0;
+  word-break: break-word;
+}
+#__audio_diag__ .__diag_log__ .__err__ { color: #F87171; }
+#__audio_diag__ .__diag_log__ .__warn__ { color: #F59E0B; }
+#__audio_diag__ .__diag_log__ .__ok__ { color: #34D399; }
+#__audio_diag__ .__diag_log__ .__info__ { color: #93C5FD; }
+
+/* Botão flutuante para reabrir o painel quando escondido */
+#__diag_reopen__ {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 99999;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(6, 13, 31, 0.85);
+  border: 1px solid rgba(91, 156, 246, 0.4);
+  color: #5B9CF6;
+  font-size: 16px;
+  font-weight: 700;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+#__diag_reopen__:active {
+  opacity: 1;
+}
+#__diag_reopen__.visible {
+  display: flex;
+}
+</style>
+<div id="__audio_diag__">
+  <div class="__diag_header__" id="__diag_header__">
+    <span class="__diag_dot__ idle" id="__diag_dot__"></span>
+    <span class="__diag_title__" id="__diag_title__">Áudio</span>
+    <span class="__diag_toggle__" id="__diag_toggle__">▾</span>
+    <span class="__diag_close__" id="__diag_close__">×</span>
+  </div>
+  <div class="__diag_body__">
+    <div class="__diag_row__"><span>Status</span><b id="__diag_status__">aguardando…</b></div>
+    <div class="__diag_row__"><span>Vozes carregadas</span><b id="__diag_voices__">?</b></div>
+    <div class="__diag_row__"><span>Speech destravado</span><b id="__diag_unlocked__">não</b></div>
+    <div class="__diag_row__"><span>Última voz usada</span><b id="__diag_last_voice__">—</b></div>
+    <div style="border-top:1px solid rgba(255,255,255,0.08);margin:6px 0;"></div>
+    <div class="__diag_row__"><span>🎤 Modo análise pron.</span><b id="__diag_pron_mode__">—</b></div>
+    <div class="__diag_row__"><span>🎙️ Áudio capturado</span><b id="__diag_pron_audio__">—</b></div>
+    <div class="__diag_row__"><span>🤖 IA usada</span><b id="__diag_pron_ai__">—</b></div>
+    <div class="__diag_row__"><span>📊 Último score</span><b id="__diag_pron_score__">—</b></div>
+    <div class="__diag_row__"><span>⚠️ Motivo fallback</span><b id="__diag_pron_reason__" style="color:#F59E0B;font-size:9px;max-width:140px;word-break:break-word;">—</b></div>
+    <div class="__diag_log__" id="__diag_log__"></div>
+  </div>
+</div>
+<div id="__diag_reopen__" title="Mostrar diagnóstico">🔧</div>
+
+<script>
+(function() {
+  var panel = document.getElementById('__audio_diag__');
+  var reopenBtn = document.getElementById('__diag_reopen__');
+  var dot = document.getElementById('__diag_dot__');
+  var statusEl = document.getElementById('__diag_status__');
+  var voicesEl = document.getElementById('__diag_voices__');
+  var unlockedEl = document.getElementById('__diag_unlocked__');
+  var lastVoiceEl = document.getElementById('__diag_last_voice__');
+  var logEl = document.getElementById('__diag_log__');
+  var titleEl = document.getElementById('__diag_title__');
+  var toggleEl = document.getElementById('__diag_toggle__');
+  var closeEl = document.getElementById('__diag_close__');
+  var headerEl = document.getElementById('__diag_header__');
+
+  // Estado persistido no localStorage
+  var STORAGE_KEY = '__fluency_diag_state__';
+  function loadState() {
+    try {
+      var s = localStorage.getItem(STORAGE_KEY);
+      return s ? JSON.parse(s) : { hidden: false, collapsed: false };
+    } catch(e) { return { hidden: false, collapsed: false }; }
+  }
+  function saveState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  }
+  var state = loadState();
+
+  function applyState() {
+    panel.classList.toggle('hidden', state.hidden);
+    panel.classList.toggle('collapsed', state.collapsed);
+    reopenBtn.classList.toggle('visible', state.hidden);
+    toggleEl.textContent = state.collapsed ? '▸' : '▾';
+  }
+  applyState();
+
+  // Header: clicar minimiza/expande
+  headerEl.addEventListener('click', function(e) {
+    if (e.target === closeEl) return; // botão de fechar tem handler próprio
+    state.collapsed = !state.collapsed;
+    saveState(state);
+    applyState();
+  });
+
+  // Botão X: esconde completamente
+  closeEl.addEventListener('click', function(e) {
+    e.stopPropagation();
+    state.hidden = true;
+    saveState(state);
+    applyState();
+  });
+
+  // Botão flutuante: reabre o painel
+  reopenBtn.addEventListener('click', function() {
+    state.hidden = false;
+    state.collapsed = false;
+    saveState(state);
+    applyState();
+  });
+
+  // Quando o painel está colapsado, o clique no painel inteiro expande
+  panel.addEventListener('click', function(e) {
+    if (state.collapsed && !state.hidden) {
+      state.collapsed = false;
+      saveState(state);
+      applyState();
+    }
+  });
+
+  function logMsg(type, msg) {
+    var line = document.createElement('div');
+    line.className = '__' + type + '__';
+    var time = new Date().toLocaleTimeString('pt-BR', {hour12: false}).slice(0,8);
+    line.textContent = time + ' ' + msg;
+    logEl.insertBefore(line, logEl.firstChild);
+    while (logEl.children.length > 30) logEl.removeChild(logEl.lastChild);
+  }
+  window.__diag_log = logMsg;
+
+  function setStatus(text, level) {
+    statusEl.textContent = text;
+    dot.className = '__diag_dot__ ' + (level || 'idle');
+    titleEl.textContent = text;
+  }
+
+  // Atualiza vozes
+  function updateVoices() {
+    if (!window.speechSynthesis) {
+      voicesEl.textContent = 'API indisponível';
+      logMsg('err', 'speechSynthesis não suportado neste navegador');
+      return;
+    }
+    var v = window.speechSynthesis.getVoices() || [];
+    voicesEl.textContent = v.length;
+  }
+  updateVoices();
+  if (window.speechSynthesis) {
+    window.speechSynthesis.addEventListener('voiceschanged', updateVoices);
+    setTimeout(updateVoices, 500);
+    setTimeout(updateVoices, 1500);
+  }
+
+  // Detectar destravamento (primeiro toque)
+  var firstClickLogged = false;
+  document.addEventListener('click', function() {
+    if (!firstClickLogged) {
+      firstClickLogged = true;
+      unlockedEl.textContent = 'sim';
+      logMsg('ok', 'Áudio destravado (primeiro toque)');
+      setTimeout(updateVoices, 100);
+    }
+  }, true);
+
+  // Monitorar speechSynthesis a cada 300ms
+  setInterval(function() {
+    if (!window.speechSynthesis) return;
+    var ss = window.speechSynthesis;
+    if (ss.speaking) {
+      setStatus('falando…', 'warn');
+    } else if (ss.pending) {
+      setStatus('na fila…', 'warn');
+    } else if (ss.paused) {
+      setStatus('pausado!', 'error');
+      logMsg('warn', 'speechSynthesis está pausado, retomando…');
+      try { ss.resume(); } catch(e) {}
+    } else {
+      if (statusEl.textContent === 'falando…' || statusEl.textContent === 'na fila…') {
+        setStatus('pronto', 'idle');
+      }
+    }
+    if (window.__ttsLastSpeak) {
+      lastVoiceEl.textContent = window.__ttsLastSpeak.voice || '(padrão)';
+    }
+  }, 300);
+
+  // Hook em SpeechSynthesisUtterance para capturar erros
+  if (window.SpeechSynthesisUtterance) {
+    var Original = window.SpeechSynthesisUtterance;
+    window.SpeechSynthesisUtterance = function(text) {
+      var inst = new Original(text);
+      var origOnEnd = null, origOnError = null, origOnStart = null;
+      Object.defineProperty(inst, 'onend', {
+        get: function() { return origOnEnd; },
+        set: function(fn) {
+          origOnEnd = function() {
+            logMsg('ok', 'Fala terminou ✓');
+            if (fn) fn.apply(this, arguments);
+          };
+        }
+      });
+      Object.defineProperty(inst, 'onerror', {
+        get: function() { return origOnError; },
+        set: function(fn) {
+          origOnError = function(ev) {
+            var errType = ev && ev.error ? ev.error : 'desconhecido';
+            logMsg('err', 'Erro fala: ' + errType);
+            if (fn) fn.apply(this, arguments);
+          };
+        }
+      });
+      Object.defineProperty(inst, 'onstart', {
+        get: function() { return origOnStart; },
+        set: function(fn) {
+          origOnStart = function() {
+            logMsg('info', 'Fala iniciou ▶');
+            if (fn) fn.apply(this, arguments);
+          };
+        }
+      });
+      var snippet = (text || '').slice(0, 30);
+      logMsg('info', 'Utterance: "' + snippet + '"');
+      return inst;
+    };
+  }
+
+  // Hook em fetch para detectar chamadas Gemini TTS
+  var origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    var u = (typeof url === 'string') ? url : (url && url.url) || '';
+    if (u.includes('generativelanguage') && opts && opts.body) {
+      var body = opts.body;
+      if (typeof body === 'string' && body.includes('AUDIO')) {
+        logMsg('info', 'Gemini TTS request →');
+        return origFetch.apply(this, arguments).then(function(resp) {
+          if (resp.ok) {
+            logMsg('ok', 'Gemini TTS ' + resp.status);
+            // Inspeciona resposta para logar mimeType
+            var cloned = resp.clone();
+            cloned.json().then(function(json) {
+              try {
+                var mt = json.candidates && json.candidates[0] &&
+                         json.candidates[0].content && json.candidates[0].content.parts &&
+                         json.candidates[0].content.parts[0] &&
+                         json.candidates[0].content.parts[0].inlineData &&
+                         json.candidates[0].content.parts[0].inlineData.mimeType;
+                if (mt) logMsg('info', 'Gemini mime: ' + mt);
+              } catch(e) {}
+            }).catch(function(){});
+          } else {
+            logMsg('err', 'Gemini TTS ' + resp.status);
+          }
+          return resp;
+        }).catch(function(err) {
+          logMsg('err', 'Gemini fetch: ' + err.message);
+          throw err;
+        });
+      }
+    }
+    return origFetch.apply(this, arguments);
+  };
+
+  // Erros globais não capturados
+  window.addEventListener('error', function(ev) {
+    if (ev.error) logMsg('err', 'JS: ' + ev.message);
+  });
+  window.addEventListener('unhandledrejection', function(ev) {
+    var msg = ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason);
+    logMsg('err', 'Promise: ' + msg.slice(0, 80));
+  });
+
+  // Estado TTS do bundle
+  window.addEventListener('ttsstate', function(ev) {
+    if (ev.detail) {
+      if (ev.detail.loading) {
+        logMsg('info', 'TTS state: loading');
+      } else if (ev.detail.error) {
+        logMsg('err', 'TTS error: ' + ev.detail.error.slice(0, 60));
+      } else {
+        logMsg('ok', 'TTS state: idle');
+      }
+    }
+  });
+
+  setStatus('pronto', 'idle');
+  logMsg('info', 'Diagnóstico iniciado');
+
+  // API pública para controlar via console:
+  // window.__diag.show()  → mostra painel
+  // window.__diag.hide()  → esconde tudo (incluindo botão flutuante)
+  // window.__diag.toggle() → alterna
+  window.__diag = {
+    show: function() {
+      state.hidden = false; state.collapsed = false;
+      saveState(state); applyState();
+    },
+    hide: function() {
+      state.hidden = true;
+      saveState(state); applyState();
+      reopenBtn.classList.remove('visible');
+    },
+    toggle: function() {
+      state.hidden = !state.hidden;
+      saveState(state); applyState();
+    },
+    log: logMsg
+  };
+})();
+</script>
+<!-- Diagnóstico de Pronúncia — atualiza os novos campos do painel -->
+<script>
+(function() {
+  function safeEl(id) { return document.getElementById(id); }
+
+  // Expõe API pública para o bundle atualizar o painel
+  window.__diagPron = {
+    setMode: function(mode) {
+      // mode: 'gemini-audio' | 'gemini-stt' | 'fallback-local'
+      var el = safeEl('__diag_pron_mode__');
+      if (!el) return;
+      el.textContent = mode;
+      el.style.color = mode === 'gemini-audio' ? '#34D399'
+                     : mode === 'gemini-stt'   ? '#F59E0B'
+                     : '#F87171';
+    },
+    setAudio: function(hasMp, sizeKb) {
+      var el = safeEl('__diag_pron_audio__');
+      if (!el) return;
+      if (hasMp) {
+        el.textContent = 'sim (' + (sizeKb|0) + ' KB)';
+        el.style.color = '#34D399';
+      } else {
+        el.textContent = 'não capturado';
+        el.style.color = '#F87171';
+      }
+    },
+    setAI: function(model) {
+      var el = safeEl('__diag_pron_ai__');
+      if (!el) return;
+      el.textContent = model || '—';
+      el.style.color = model ? '#34D399' : '#F87171';
+    },
+    setScore: function(score, source) {
+      var el = safeEl('__diag_pron_score__');
+      if (!el) return;
+      el.textContent = (score !== null && score !== undefined) ? score + '% (' + (source||'?') + ')' : '—';
+      el.style.color = score >= 80 ? '#34D399' : score >= 60 ? '#F59E0B' : '#F87171';
+    },
+    setReason: function(reason) {
+      var el = safeEl('__diag_pron_reason__');
+      if (!el) return;
+      if (reason) {
+        el.textContent = reason;
+        el.style.color = '#F59E0B';
+        // também loga no painel de log
+        if (window.__diag_log) window.__diag_log('warn', '🎤 Pron fallback: ' + reason.slice(0, 70));
+      } else {
+        el.textContent = 'nenhum';
+        el.style.color = '#34D399';
+      }
+    },
+    reset: function() {
+      window.__diagPron.setMode('—');
+      safeEl('__diag_pron_mode__') && (safeEl('__diag_pron_mode__').style.color = '');
+      safeEl('__diag_pron_audio__') && (safeEl('__diag_pron_audio__').textContent = '—');
+      safeEl('__diag_pron_ai__') && (safeEl('__diag_pron_ai__').textContent = '—');
+      safeEl('__diag_pron_score__') && (safeEl('__diag_pron_score__').textContent = '—');
+      safeEl('__diag_pron_reason__') && (safeEl('__diag_pron_reason__').textContent = '—');
+    }
+  };
+
+  // Intercepta chamadas à API Gemini de pronúncia para logar no painel
+  var origFetch = window.fetch;
+  if (origFetch && !window.__pronDiagHooked) {
+    window.__pronDiagHooked = true;
+    window.fetch = function(url, opts) {
+      var u = (typeof url === 'string') ? url : (url && url.url) || '';
+      var isPronReq = u.includes('generativelanguage') && opts && opts.body &&
+                      typeof opts.body === 'string' &&
+                      (opts.body.includes('pronúncia') || opts.body.includes('pronunciation') ||
+                       opts.body.includes('pronuncia') || opts.body.includes('EXIGENTE') ||
+                       opts.body.includes('score') || opts.body.includes('sotaque'));
+      if (isPronReq) {
+        var hasAudio = opts.body.includes('"inlineData"') || opts.body.includes('base64');
+        var modelMatch = u.match(/models\/([^:]+):/);
+        var model = modelMatch ? modelMatch[1] : 'desconhecido';
+        if (window.__diag_log) window.__diag_log('info', '🎤 Pron API: ' + model + (hasAudio ? ' + áudio' : ' só STT'));
+        if (window.__diagPron) {
+          window.__diagPron.setAI(model);
+          window.__diagPron.setMode(hasAudio ? 'gemini-audio' : 'gemini-stt');
+        }
+        return origFetch.apply(this, arguments).then(function(resp) {
+          if (!resp.ok) {
+            if (window.__diag_log) window.__diag_log('err', '🎤 Pron API erro ' + resp.status);
+            if (window.__diagPron) window.__diagPron.setReason('HTTP ' + resp.status + ' da API Gemini');
+          } else {
+            if (window.__diag_log) window.__diag_log('ok', '🎤 Pron API OK ' + resp.status);
+          }
+          return resp;
+        }).catch(function(err) {
+          if (window.__diag_log) window.__diag_log('err', '🎤 Pron fetch: ' + err.message);
+          if (window.__diagPron) window.__diagPron.setReason('Fetch error: ' + err.message.slice(0, 50));
+          throw err;
+        });
+      }
+      return origFetch.apply(this, arguments);
+    };
+  }
+})();
+</script>
 </body>
 </html>
