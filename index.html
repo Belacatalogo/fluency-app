@@ -324,7 +324,7 @@ window.__ttsState = window.__ttsState || {
 <script src="azure-pronunciation.js?v=1"></script>
 
 <!-- bundle.js define window.React, window.ReactDOM e window.__AppComponent -->
-<script src="bundle.js?v=29"></script>
+<script src="bundle.js?v=31"></script>
 
 <!-- Renderização em script separado, garantindo execução após bundle.js -->
 <script>
@@ -651,6 +651,11 @@ window.__ttsState = window.__ttsState || {
 (function() {
   var panel = document.getElementById('__audio_diag__');
   var reopenBtn = document.getElementById('__diag_reopen__');
+  // Painel só aparece com ?diag=1 na URL (oculto em produção).
+  if (!/[?&]diag=1(&|$)/.test(location.search)) {
+    panel.style.display = 'none';
+    reopenBtn.style.display = 'none';
+  }
   var dot = document.getElementById('__diag_dot__');
   var statusEl = document.getElementById('__diag_status__');
   var voicesEl = document.getElementById('__diag_voices__');
