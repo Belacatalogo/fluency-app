@@ -4,17 +4,19 @@ const e = React.createElement
 
   var page = {
     minHeight: "100vh",
-    background: "#12100e",
-    color: "#f4efe6",
-    fontFamily: "Georgia, 'Iowan Old Style', Palatino, serif",
+    background: "transparent",
+    color: "#E8EFF8",
+    fontFamily: "'Instrument Sans', -apple-system, system-ui, sans-serif",
   };
-  var sans = { fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
-  var ink = "#12100e";
-  var copper = "#e4a15a";
-  var line = "rgba(244,239,230,.14)";
-  var muted = "#b7ab9d";
-  var good = "#8fbf8a";
-  var bad = "#e08b78";
+  var sans = { fontFamily: "'Instrument Sans', -apple-system, system-ui, sans-serif" };
+  var ink = "#fff";
+  var copper = "#5B9CF6";
+  var line = "rgba(255,255,255,0.12)";
+  var muted = "#8FA8C8";
+  var good = "#34D399";
+  var bad = "#F87171";
+  var glass = "rgba(255,255,255,0.06)";
+  var dock = "rgba(5,12,30,0.88)";
 
   function norm(value) {
     return String(value || "")
@@ -162,9 +164,10 @@ const e = React.createElement
     return {
       height: "48px",
       flex: 1,
-      borderRadius: "999px",
-      background: copper,
-      color: ink,
+      borderRadius: "10px",
+      border: "1px solid rgba(255,255,255,0.2)",
+      boxShadow: "0 4px 16px rgba(91,156,246,0.35)",
+      fontFamily: "'Instrument Sans', sans-serif",
       fontSize: "16px",
       fontWeight: 600,
       opacity: disabled ? 0.4 : 1,
@@ -175,7 +178,7 @@ const e = React.createElement
     borderRadius: "999px",
     border: "1px solid " + line,
     background: "transparent",
-    color: "#f4efe6",
+    color: "#E8EFF8",
     padding: "0 18px",
     fontSize: "16px",
   };
@@ -189,7 +192,7 @@ const e = React.createElement
         { style: { maxWidth: "32rem", margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column" } },
         e(
           "header",
-          { style: Object.assign({ position: "sticky", top: 0, background: "#12100e", borderBottom: "1px solid " + line, padding: "12px 20px" }, sans) },
+          { style: Object.assign({ position: "sticky", top: 0, background: "rgba(5,12,30,0.88)", borderBottom: "1px solid " + line, padding: "12px 20px" }, sans) },
           e(
             "div",
             { style: { display: "flex", gap: "12px", alignItems: "center" } },
@@ -203,14 +206,14 @@ const e = React.createElement
           ),
           e(
             "div",
-            { style: { marginTop: "12px", height: "4px", background: "#2a261f", borderRadius: "99px", overflow: "hidden" } },
+            { style: { marginTop: "12px", height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "99px", overflow: "hidden" } },
             e("div", { style: { height: "100%", width: ((props.index + 1) / props.total) * 100 + "%", background: copper } })
           )
         ),
         e("main", { style: { flex: 1, padding: "24px 20px 140px" } }, props.children),
         e(
           "footer",
-          { style: { position: "fixed", left: 0, right: 0, bottom: 0, background: "#12100e", borderTop: "1px solid " + line, padding: "16px 20px calc(16px + env(safe-area-inset-bottom))" } },
+          { style: { position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(5,12,30,0.88)", borderTop: "1px solid " + line, padding: "16px 20px calc(16px + env(safe-area-inset-bottom))" } },
           e(
             "div",
             { style: Object.assign({ maxWidth: "32rem", margin: "0 auto", display: "flex", gap: "12px" }, sans) },
@@ -251,8 +254,8 @@ const e = React.createElement
                 minHeight: "56px",
                 borderRadius: "16px",
                 border: "1px solid " + (show ? (ok ? good : bad) : line),
-                background: "#1c1915",
-                color: show ? (ok ? good : bad) : "#f4efe6",
+                background: "rgba(255,255,255,0.06)",
+                color: show ? (ok ? good : bad) : "#E8EFF8",
                 padding: "16px",
                 fontSize: "18px",
               },
@@ -305,7 +308,7 @@ const e = React.createElement
                 onClick: function () {
                   speak(row[2]);
                 },
-                style: { display: "flex", width: "100%", gap: "12px", textAlign: "left", background: "transparent", color: "#f4efe6", border: 0, borderTop: "1px solid " + line, padding: "14px 0" },
+                style: { display: "flex", width: "100%", gap: "12px", textAlign: "left", background: "transparent", color: "#E8EFF8", border: 0, borderTop: "1px solid " + line, padding: "14px 0" },
               },
               e("span", { style: Object.assign({ width: "48px", color: muted }, sans) }, row[0]),
               e("span", { style: { width: "52px", color: copper, fontSize: "24px" } }, row[1]),
@@ -331,7 +334,7 @@ const e = React.createElement
               onClick: function () {
                 speak(lineText);
               },
-              style: { display: "block", width: "100%", textAlign: "left", marginTop: "12px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", fontSize: "24px" },
+              style: { display: "block", width: "100%", textAlign: "left", marginTop: "12px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", fontSize: "24px" },
             },
             lineText
           );
@@ -390,7 +393,7 @@ const e = React.createElement
           setValue(event.target.value);
           setChecked(false);
         },
-        style: Object.assign({ width: "100%", height: "48px", marginTop: "12px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", padding: "0 16px", fontSize: "18px" }, sans),
+        style: Object.assign({ width: "100%", height: "48px", marginTop: "12px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", padding: "0 16px", fontSize: "18px" }, sans),
       }),
       !checked
         ? button("Conferir", function () { setChecked(true); props.onDone(); }, !value.trim(), false)
@@ -419,7 +422,7 @@ const e = React.createElement
           setValue(event.target.value);
           setChecked(false);
         },
-        style: Object.assign({ width: "100%", marginTop: "16px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", padding: "12px 16px", fontSize: "18px" }, sans),
+        style: Object.assign({ width: "100%", marginTop: "16px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", padding: "12px 16px", fontSize: "18px" }, sans),
       }),
       !checked
         ? button("Conferir", function () { setChecked(true); props.onDone(); }, !value.trim(), false)
@@ -500,7 +503,7 @@ const e = React.createElement
       body = e("div", null,
         e("h1", { style: { fontSize: "32px", fontWeight: 500, margin: 0 } }, "Escreva a última fala da Lia."),
         e("button", { type: "button", onClick: play, style: Object.assign({ background: "transparent", color: copper, border: 0, margin: "12px 0" }, sans) }, "Ouvir a cena de novo"),
-        e("textarea", { value: draft, rows: 3, onChange: function (event) { setDraft(event.target.value); setChecked(false); setReady(false); }, style: Object.assign({ width: "100%", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", padding: "12px", fontSize: "18px" }, sans) }),
+        e("textarea", { value: draft, rows: 3, onChange: function (event) { setDraft(event.target.value); setChecked(false); setReady(false); }, style: Object.assign({ width: "100%", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", padding: "12px", fontSize: "18px" }, sans) }),
         !checked
           ? button("Conferir o ditado", function () { setChecked(true); setReady(true); }, !draft.trim(), false)
           : e("p", { style: Object.assign({ color: muted }, sans) }, dictOk ? "Você pegou a fala." : "O que foi dito: Nice to meet you.")
@@ -511,7 +514,7 @@ const e = React.createElement
         !open
           ? button("Abrir a transcrição", function () { setOpen(true); setReady(true); }, false, false)
           : e("div", null, lines.map(function (lineItem) {
-            return e("div", { key: lineItem.en, style: { marginTop: "12px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915" } },
+            return e("div", { key: lineItem.en, style: { marginTop: "12px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)" } },
               e("p", { style: Object.assign({ color: copper, margin: 0 }, sans) }, lineItem.who),
               e("p", { style: { fontSize: "24px", margin: "4px 0" } }, lineItem.en),
               e("p", { style: Object.assign({ color: muted, margin: 0 }, sans) }, lineItem.pt)
@@ -571,7 +574,7 @@ const e = React.createElement
         rows: 3,
         placeholder: "Ou escreva o que você disse",
         onChange: function (event) { props.onChange(event.target.value); },
-        style: Object.assign({ width: "100%", marginTop: "12px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", padding: "12px", fontSize: "18px" }, sans),
+        style: Object.assign({ width: "100%", marginTop: "12px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", padding: "12px", fontSize: "18px" }, sans),
       }),
       props.checked === null
         ? button("Conferir a fala", props.onCheck, !props.value.trim(), false)
@@ -608,7 +611,7 @@ const e = React.createElement
         e("button", {
           type: "button",
           onClick: function () { speak("Hi. I'm Luis."); setHeard(true); },
-          style: { width: "100%", textAlign: "left", borderRadius: "24px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", padding: "20px" },
+          style: { width: "100%", textAlign: "left", borderRadius: "24px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", padding: "20px" },
         }, e("span", { style: { display: "block", color: muted, fontFamily: sans.fontFamily, fontSize: "14px" } }, "Modelo"), e("span", { style: { display: "block", fontSize: "36px", marginTop: "8px" } }, "Hi. I'm Luis."))
       );
     } else if (index === 1) {
@@ -616,7 +619,7 @@ const e = React.createElement
     } else if (index === 2) {
       body = e("div", null,
         e("p", { style: Object.assign({ color: copper, margin: 0 }, sans) }, "Ana"),
-        e("button", { type: "button", onClick: function () { speak("What's your name?"); }, style: { display: "block", width: "100%", textAlign: "left", marginTop: "8px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", fontSize: "28px" } }, "What's your name?"),
+        e("button", { type: "button", onClick: function () { speak("What's your name?"); }, style: { display: "block", width: "100%", textAlign: "left", marginTop: "8px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", fontSize: "28px" } }, "What's your name?"),
         e("div", { style: { marginTop: "20px" } }, e(SpeakBox, { title: "Responda em voz alta.", value: answer, onChange: function (value) { setAnswer(value); setAnswered(null); }, checked: answered, onCheck: function () { setAnswered(matchesSpeech(answer)); }, model: "I'm Luis." }))
       );
     } else {
@@ -697,7 +700,7 @@ const e = React.createElement
               e("p", { style: Object.assign({ color: copper, margin: 0 }, sans) }, "Player de vocabulário"),
               e("h1", { style: { fontSize: "32px", fontWeight: 500 } }, "Cinco palavras. Toque para ouvir."),
               words.map(function (word) {
-                return e("button", { key: word[0], type: "button", onClick: function () { speak(word[0]); }, style: { display: "block", width: "100%", textAlign: "left", marginTop: "12px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6" } },
+                return e("button", { key: word[0], type: "button", onClick: function () { speak(word[0]); }, style: { display: "block", width: "100%", textAlign: "left", marginTop: "12px", padding: "16px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8" } },
                   e("span", { style: { display: "block", fontSize: "28px" } }, word[0]),
                   e("span", { style: Object.assign({ color: muted }, sans) }, word[1] + " · " + word[2])
                 );
@@ -788,7 +791,7 @@ const e = React.createElement
             return e("div", null,
               e("p", { style: Object.assign({ color: copper, margin: 0 }, sans) }, "Player de writing"),
               e("h1", { style: { fontSize: "30px", fontWeight: 500 } }, "Escreva duas frases: o seu nome com I am, e a sua cidade com I am from."),
-              e("textarea", { value: value, rows: 5, onChange: function (event) { setValue(event.target.value); setChecked(null); }, style: Object.assign({ width: "100%", marginTop: "12px", borderRadius: "16px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", padding: "12px", fontSize: "18px" }, sans) }),
+              e("textarea", { value: value, rows: 5, onChange: function (event) { setValue(event.target.value); setChecked(null); }, style: Object.assign({ width: "100%", marginTop: "12px", borderRadius: "16px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", padding: "12px", fontSize: "18px" }, sans) }),
               checked === null
                 ? button("Conferir", function () { setChecked(ok); done(); }, !value.trim(), false)
                 : e("p", { style: Object.assign({ color: muted }, sans) }, ok ? "As duas ideias estão aí." : "Modelo: I am Luis. I am from Brasília.")
@@ -826,7 +829,7 @@ const e = React.createElement
         e("p", { style: Object.assign({ color: copper, margin: 0 }, sans) }, "Fluency"),
         e("h1", { style: { fontSize: "40px", lineHeight: 1.1, fontWeight: 500, margin: "8px 0 0" } }, "Um dia, um pilar."),
         e("p", { style: Object.assign({ color: muted, lineHeight: 1.5, maxWidth: "22rem" }, sans) }, "Gramática, listening e speaking não dividem a mesma tela. O player muda com a habilidade."),
-        e("a", { href: "#/aula/" + next.id, style: { display: "block", marginTop: "28px", padding: "20px", borderRadius: "24px", border: "1px solid " + line, background: "#1c1915", color: "#f4efe6", textDecoration: "none" } },
+        e("a", { href: "#/aula/" + next.id, style: { display: "block", marginTop: "28px", padding: "20px", borderRadius: "24px", border: "1px solid " + line, background: "rgba(255,255,255,0.06)", color: "#E8EFF8", textDecoration: "none" } },
           e("p", { style: Object.assign({ color: copper, margin: 0 }, sans) }, "Aula de hoje · " + next.pillar),
           e("h2", { style: { fontSize: "32px", fontWeight: 500, margin: "8px 0 0" } }, next.title),
           e("p", { style: Object.assign({ color: muted }, sans) }, next.minutes + " min · player de " + next.pillar.toLowerCase()),
