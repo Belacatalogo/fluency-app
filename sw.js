@@ -1,5 +1,5 @@
 // Fluency Service Worker — offline cache
-const CACHE = "fluency-v30";
+const CACHE = "fluency-v31";
 const STATIC = ["./", "./index.html", "./bundle.js", "./manifest.json", "./azure-pronunciation.js"];
 
 self.addEventListener("install", e => {
